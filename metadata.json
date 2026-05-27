@@ -1,0 +1,8 @@
+{
+  "name": "Ozon 订单抓取助手",
+  "description": "输入Ozon店铺ID和秘钥，抓取订单并一键导出Excel数据，支持按SKU汇总统计计算销量。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
