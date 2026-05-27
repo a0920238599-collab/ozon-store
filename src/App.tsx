@@ -49,10 +49,25 @@ const App = () => {
   const parseCredentials = (text: string) => {
     const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
     const creds = [];
-    for (const line of lines) {
-      const parts = line.split(/[\t\s,]+/).filter(Boolean);
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // delimiter could be space, tab, comma, colon, vertical bar
+      const parts = line.split(/[\t\s,，:：|]+/).filter(Boolean);
+      
       if (parts.length >= 2) {
+        // Find the first two parts of the line as ID and Key
         creds.push({ clientId: parts[0], apiKey: parts[1] });
+      } else if (parts.length === 1) {
+        // If the current line has exactly 1 part, check if the next line also has exactly 1 part
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const nextParts = nextLine.split(/[\t\s,，:：|]+/).filter(Boolean);
+          if (nextParts.length >= 1) {
+             creds.push({ clientId: parts[0], apiKey: nextParts[0] });
+             i++; // Skip the next line as it was consumed
+          }
+        }
       }
     }
     return creds;
@@ -118,7 +133,7 @@ const App = () => {
   const fetchOrders = async () => {
     const credentials = parseCredentials(credentialsText);
     if (credentials.length === 0 || !dateFrom || !dateTo) {
-      setError("请粘贴至少一组有效的店铺配置 (ID 和 API Key)，并选择日期");
+      setError("输入格式不匹配：请粘贴至少一组有效的店铺配置 (ID 和 API Key)。如果在两行内输入，请确保格式正确。");
       return;
     }
     
@@ -148,7 +163,18 @@ const App = () => {
             fetchErrors.push(`店铺 ${cred.clientId} 失败: ${res.data.error}`);
           }
         } catch (err: any) {
-           fetchErrors.push(`店铺 ${cred.clientId} 错误: ${err.response?.data?.error || err.message}`);
+           let errorMsg = "未知错误";
+           if (err.response?.data?.error) {
+             const errData = err.response.data.error;
+             errorMsg = typeof errData === 'object' ? JSON.stringify(errData) : errData;
+           } else if (err.response?.data?.message) {
+             errorMsg = err.response.data.message;
+           } else if (err.response?.data) {
+             errorMsg = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
+           } else {
+             errorMsg = err.message;
+           }
+           fetchErrors.push(`店铺 ${cred.clientId} 错误: ${errorMsg}`);
         }
       }
 

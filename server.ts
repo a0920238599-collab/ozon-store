@@ -1,12 +1,14 @@
 import express from "express";
 import path from "path";
 import axios from "axios";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
   app.post("/api/ozon/orders", async (req, res) => {
@@ -18,8 +20,8 @@ async function startServer() {
       }
 
       const headers = {
-        "Client-Id": clientId,
-        "Api-Key": apiKey,
+        "Client-Id": String(clientId),
+        "Api-Key": String(apiKey),
         "Content-Type": "application/json",
       };
 
@@ -61,7 +63,13 @@ async function startServer() {
           if (hasMore) offset += limit;
         } catch (fbsError: any) {
           console.error("FBS Fetch Error:", fbsError.response?.data || fbsError.message);
-          // If FBS fails entirely (e.g. not configured), we just break.
+          const ozonErr = fbsError.response?.data?.error || fbsError.response?.data;
+          const status = fbsError.response?.status;
+          if (status === 401 || status === 403 || status === 400) {
+             return res.status(status).json({ 
+               error: `获取 FBS 失败 (状态码 ${status})。错误详情: ${typeof ozonErr === 'object' ? JSON.stringify(ozonErr) : ozonErr}` 
+             });
+          }
           hasMore = false;
         }
       }
@@ -104,6 +112,14 @@ async function startServer() {
 
         } catch (fboError: any) {
           console.error("FBO Fetch Error:", fboError.response?.data || fboError.message);
+          const ozonErr = fboError.response?.data?.error || fboError.response?.data;
+          const status = fboError.response?.status;
+          // If FBO fails with authentication or validation error, report it unless we already have some FBS orders
+          if ((status === 401 || status === 403 || status === 400) && allOrders.length === 0) {
+             return res.status(status).json({ 
+               error: `获取 FBO 失败 (状态码 ${status})。错误详情: ${typeof ozonErr === 'object' ? JSON.stringify(ozonErr) : ozonErr}` 
+             });
+          }
           hasMore = false;
         }
       }
